@@ -1,0 +1,52 @@
+stages:
+  - build
+  - push
+  - pull
+  - deploy
+variables:
+  IMAGE_VOTE: "votingapp-vote"
+  IMAGE_WORKER: "votingapp-worker"
+  IMAGE_RESULT: "votingapp-result"
+  IMAGE_TAG: "latest"
+build_job:
+  stage: build
+  script: 
+    - docker build -t $IMAGE_VOTE:$IMAGE_TAG -f vote/Dockerfile vote
+    - docker build -t $IMAGE_WORKER:$IMAGE_TAG -f worker/Dockerfile worker
+    - docker build -t $IMAGE_RESULT:$IMAGE_TAG -f result/Dockerfile result
+  tags:
+    - dev
+push_job:
+  stage: push
+  script:
+    - docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
+    - docker tag $IMAGE_VOTE:$IMAGE_TAG $DOCKERHUB_USERNAME/$IMAGE_VOTE:$IMAGE_TAG
+    - docker tag $IMAGE_WORKER:$IMAGE_TAG $DOCKERHUB_USERNAME/$IMAGE_WORKER:$IMAGE_TAG
+    - docker tag $IMAGE_RESULT:$IMAGE_TAG $DOCKERHUB_USERNAME/$IMAGE_RESULT:$IMAGE_TAG
+    - docker push $DOCKERHUB_USERNAME/$IMAGE_VOTE:$IMAGE_TAG
+    - docker push $DOCKERHUB_USERNAME/$IMAGE_WORKER:$IMAGE_TAG
+    - docker push $DOCKERHUB_USERNAME/$IMAGE_RESULT:$IMAGE_TAG
+    - docker rmi $IMAGE_VOTE:$IMAGE_TAG || true
+    - docker rmi $IMAGE_WORKER:$IMAGE_TAG || true
+    - docker rmi $IMAGE_RESULT:$IMAGE_TAG || true
+    - docker rmi $DOCKERHUB_USERNAME/$IMAGE_VOTE:$IMAGE_TAG || true
+    - docker rmi $DOCKERHUB_USERNAME/$IMAGE_WORKER:$IMAGE_TAG || true
+    - docker rmi $DOCKERHUB_USERNAME/$IMAGE_RESULT:$IMAGE_TAG || true
+    - docker logout
+  tags:
+    - dev
+pull_job:
+  stage: pull
+  script:
+    - docker pull $DOCKERHUB_USERNAME/$IMAGE_VOTE:$IMAGE_TAG
+    - docker pull $DOCKERHUB_USERNAME/$IMAGE_WORKER:$IMAGE_TAG
+    - docker pull $DOCKERHUB_USERNAME/$IMAGE_RESULT:$IMAGE_TAG
+  tags:
+    - dev
+deploy_job:
+  stage: deploy
+  script:
+    - docker compose -f docker-compose.yml down || true
+    - docker compose -f docker-compose.yml up -d --force-recreate
+  tags:
+    - dev
