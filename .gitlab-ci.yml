@@ -8,24 +8,37 @@ variables:
   IMAGE_WORKER: "votingapp-worker"
   IMAGE_RESULT: "votingapp-result"
   IMAGE_TAG: "latest"
+default:
+  artifacts:
+    when: always
+    paths:
+      - logs/
+    expire_in: 1 week
 build_job:
   stage: build
   script: 
+    - mkdir -p logs
     - docker build -t $IMAGE_VOTE:$IMAGE_TAG -f vote/Dockerfile vote
     - docker build -t $IMAGE_WORKER:$IMAGE_TAG -f worker/Dockerfile worker
     - docker build -t $IMAGE_RESULT:$IMAGE_TAG -f result/Dockerfile result
+    - echo "images is successfully build" > logs/app.log
   tags:
     - dev
 push_job:
   stage: push
+  dependencies:
+    - build_job
   script:
     - docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
+    - echo "login succeed" >> logs/app.log
     - docker tag $IMAGE_VOTE:$IMAGE_TAG $DOCKERHUB_USERNAME/$IMAGE_VOTE:$IMAGE_TAG
     - docker tag $IMAGE_WORKER:$IMAGE_TAG $DOCKERHUB_USERNAME/$IMAGE_WORKER:$IMAGE_TAG
     - docker tag $IMAGE_RESULT:$IMAGE_TAG $DOCKERHUB_USERNAME/$IMAGE_RESULT:$IMAGE_TAG
+    - echo "images rename are done" >> logs/app.log
     - docker push $DOCKERHUB_USERNAME/$IMAGE_VOTE:$IMAGE_TAG
     - docker push $DOCKERHUB_USERNAME/$IMAGE_WORKER:$IMAGE_TAG
     - docker push $DOCKERHUB_USERNAME/$IMAGE_RESULT:$IMAGE_TAG
+    - echo "push is done" >> logs/app.log
     - docker rmi $IMAGE_VOTE:$IMAGE_TAG || true
     - docker rmi $IMAGE_WORKER:$IMAGE_TAG || true
     - docker rmi $IMAGE_RESULT:$IMAGE_TAG || true
@@ -33,20 +46,27 @@ push_job:
     - docker rmi $DOCKERHUB_USERNAME/$IMAGE_WORKER:$IMAGE_TAG || true
     - docker rmi $DOCKERHUB_USERNAME/$IMAGE_RESULT:$IMAGE_TAG || true
     - docker logout
+    - echo "logout succeed" >> logs/app.log
   tags:
     - dev
 pull_job:
   stage: pull
+  dependencies:
+    - push_job
   script:
     - docker pull $DOCKERHUB_USERNAME/$IMAGE_VOTE:$IMAGE_TAG
     - docker pull $DOCKERHUB_USERNAME/$IMAGE_WORKER:$IMAGE_TAG
     - docker pull $DOCKERHUB_USERNAME/$IMAGE_RESULT:$IMAGE_TAG
+    - echo "docker pull images is done" >> logs/app.log
   tags:
     - dev
 deploy_job:
   stage: deploy
+  dependencies:
+    - pull_job
   script:
     - docker compose -f docker-compose.yml down || true
     - docker compose -f docker-compose.yml up -d --force-recreate
+    - echo "application is live now" >> logs/app.log
   tags:
     - dev
