@@ -32,6 +32,7 @@ pipeline{
             steps{
                 sh "docker compose -f docker-compose.yml down || true"
                 sh "docker compose -f docker-compose.yml up -d --force-recreate"
+                sh "echo 'deploying is successfull'"
             }
         }
     }
